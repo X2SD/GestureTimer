@@ -1,0 +1,18 @@
+# Node / frontend
+node_modules/
+dist/
+
+# Rust / Tauri
+**/target/
+*.pdb
+
+# 本地打包的便携目录与压缩包（勿提交二进制分发物）
+simple/速写计时器-便携版/
+simple/*便携*.zip
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vs/
+.idea/
+*.log

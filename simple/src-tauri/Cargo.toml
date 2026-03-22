@@ -1,0 +1,18 @@
+[package]
+name = "sketch-timer"
+version = "1.0.0"
+description = "速写计时器"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "sketch_timer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+base64 = "0.22"
+rfd = "0.15"

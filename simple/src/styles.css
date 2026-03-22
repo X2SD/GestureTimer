@@ -1,0 +1,595 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  /* 单按钮预设 + 大号倒计时 + 运输条 + padding */
+  --bar-height: 152px;
+  --accent-soft: #5a8fb8;
+  --accent-soft-hover: #7aaed6;
+  --accent-dim: #3d6a8a;
+  --timer-blue: #5a9fd4;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #e8e8e8;
+  font-family: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  user-select: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+#app.hidden {
+  display: none;
+}
+
+.app-topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+
+#empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+
+#empty.hidden {
+  display: none;
+}
+
+#empty p {
+  margin: 0;
+  font-size: 16px;
+  color: #ccc;
+}
+
+#empty .hint {
+  font-size: 13px;
+  color: #666;
+}
+
+#empty-open {
+  padding: 10px 22px;
+  font-size: 15px;
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  background: #1e6bd6;
+  color: #fff;
+}
+
+#empty-open:hover {
+  background: #2a7aee;
+}
+
+/* 图片区：占满「窗口内容区 − 底栏」；与系统菜单栏无关，由 Electron 客户区自动扣除 */
+#stage {
+  flex: 1 1 auto;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #000000;
+  overflow: hidden;
+}
+
+#photo-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#photo-viewport.is-panning {
+  cursor: grabbing;
+}
+
+#photo-transform {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+/* 完整显示图片；缩放/平移由 transform 叠加 */
+#photo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+#bar {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: var(--bar-height);
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: end;
+  gap: 10px 12px;
+  padding: 12px 14px 14px;
+  background: #0a0a0a;
+  border-top: 1px solid #222;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.bar-left {
+  justify-self: start;
+  align-self: end;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.preset-dropdown-wrap {
+  position: relative;
+}
+
+.preset-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 72px;
+  height: 48px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: #1e6bd6;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.preset-trigger:hover {
+  background: #2a7aee;
+}
+
+.preset-trigger[aria-expanded='true'] {
+  background: #2568c4;
+}
+
+.preset-trigger[aria-expanded='true'] .preset-trigger-chevron {
+  transform: rotate(180deg);
+}
+
+.preset-trigger-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+/* 仅盖住图片区，不盖住底栏，以便仍能点击播放等；底栏其它区域由 JS 捕获关闭 */
+.preset-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--bar-height, 152px);
+  z-index: 900;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.preset-backdrop.hidden {
+  display: none;
+}
+
+/* 自底栏向上展开 */
+.preset-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 901;
+  display: flex;
+  flex-direction: column;
+  min-width: 132px;
+  padding: 6px;
+  background: #141820;
+  border: 1px solid rgba(100, 150, 210, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.55);
+  animation: preset-menu-up 0.18s ease-out;
+}
+
+.preset-menu.hidden {
+  display: none;
+}
+
+@keyframes preset-menu-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.preset-option {
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(230, 240, 255, 0.75);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.preset-option:hover {
+  background: rgba(40, 100, 180, 0.45);
+  color: #fff;
+}
+
+.preset-option.is-selected {
+  background: rgba(30, 107, 214, 0.55);
+  color: #fff;
+}
+
+.bar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  min-width: 0;
+  align-self: end;
+}
+
+.bar-center-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.nav-btn {
+  flex-shrink: 0;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 圆形大触控区，方便画笔/手指点按 */
+.nav-btn-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(110, 175, 235, 0.55);
+  background: rgba(26, 62, 112, 0.68);
+  color: #c5e4ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.08s ease;
+}
+
+.nav-btn-circle:hover:not(:disabled) {
+  background: rgba(38, 88, 155, 0.82);
+  border-color: rgba(160, 210, 255, 0.75);
+  color: #f0f8ff;
+}
+
+.nav-btn-circle:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.nav-btn-circle svg {
+  display: block;
+  pointer-events: none;
+}
+
+.nav-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+#timer {
+  min-width: 6ch;
+  text-align: center;
+  font-size: clamp(36px, 6vmin, 52px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #7ec8ff;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  text-shadow: 0 0 24px rgba(80, 160, 255, 0.25);
+}
+
+.transport-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(25, 55, 95, 0.55);
+  border: 1px solid rgba(100, 160, 220, 0.35);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.transport-btn {
+  width: 40px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #9fd0ff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.12s ease, opacity 0.12s ease, background 0.12s ease;
+}
+
+.transport-btn:hover:not(:disabled) {
+  color: #d4ecff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.transport-btn.is-dim {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.transport-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bar-right {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  justify-self: end;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.bar-total-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 52px;
+}
+
+.total-playback {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(130, 200, 255, 0.72);
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent-soft);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  color: var(--accent-soft-hover);
+  background: rgba(90, 143, 184, 0.12);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal {
+  width: 100%;
+  max-width: 360px;
+  padding: 20px 22px;
+  background: #121212;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.modal-desc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #9a9a9a;
+}
+
+.modal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+#total-hours-input {
+  width: 100%;
+  max-width: 120px;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: #0d0d0d;
+  border: 2px solid #1e6bd6;
+  border-radius: 6px;
+  outline: none;
+}
+
+#total-hours-input:focus {
+  border-color: #4a9eff;
+}
+
+.modal-unit {
+  font-size: 16px;
+  color: #ccc;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-actions.single {
+  justify-content: center;
+}
+
+.modal-btn {
+  padding: 8px 18px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+}
+
+.modal-btn.secondary {
+  background: #2a2a2a;
+  color: #ddd;
+}
+
+.modal-btn.secondary:hover {
+  background: #3a3a3a;
+}
+
+.modal-btn.primary {
+  background: #1e6bd6;
+  color: #fff;
+}
+
+.modal-btn.primary:hover {
+  background: #2a7aee;
+}
+
+/* ========== 修复：设置弹窗文字挤压问题 ========== */
+.checkbox-row {
+  margin: 18px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column; /* 垂直排版，避免文字挤在一起 */
+  gap: 4px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center; /* 复选框和文字居中对齐 */
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: #1e6bd6;
+  cursor: pointer;
+}
+
+.checkbox-text {
+  font-size: 14px;
+  color: #e8e8e8;
+  line-height: 1.4;
+}
+
+.checkbox-hint {
+  margin: 0 0 0 24px; /* 仅左缩进，取消上间距 */
+  font-size: 12px;
+  color: #9a9a9a;
+  line-height: 1.4;
+  word-wrap: break-word;
+  max-width: 280px; /* 限制宽度，避免换行异常 */
+}
+
+/* ========== 优化：计时结束弹窗文本换行 ========== */
+#panel-session-end .modal-desc {
+  line-height: 1.6;
+  word-wrap: break-word;
+  white-space: normal;
+}
+
+/* ========== 图片抽取完毕弹窗样式 ========== */
+#panel-images-exhausted .modal-row {
+  margin-bottom: 12px;
+}
