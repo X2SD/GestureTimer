@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "速写计时器",
-  "version": "1.0.0",
-  "identifier": "com.sketch.timer",
+  "productName": "GestureTimer",
+  "version": "1.1.0",
+  "identifier": "com.gesture.timer",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,11 +13,11 @@
     "windows": [
       {
         "label": "main",
-        "title": "速写计时器",
+        "title": "GestureTimer",
         "width": 1000,
         "height": 700,
-        "minWidth": 520,
-        "minHeight": 460,
+        "minWidth": 400,
+        "minHeight": 420,
         "resizable": true
       }
     ],

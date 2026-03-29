@@ -68,7 +68,36 @@ fn pick_folder() -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        builder = builder.plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_shortcuts(["CommandOrControl+KeyT"])
+                .expect("register global shortcut CommandOrControl+KeyT")
+                .with_handler(|app, _shortcut, event| {
+                    use tauri::{Emitter, Manager};
+                    use tauri_plugin_global_shortcut::ShortcutState;
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+                    let app = app.clone();
+                    let _ = app.clone().run_on_main_thread(move || {
+                        if let Some(win) = app.get_webview_window("main") {
+                            let cur = win.is_always_on_top().unwrap_or(false);
+                            let next = !cur;
+                            if win.set_always_on_top(next).is_ok() {
+                                let _ = app.emit("always-on-top-changed", next);
+                            }
+                        }
+                    });
+                })
+                .build(),
+        );
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             read_image_data_url,
             list_images_in_folder,

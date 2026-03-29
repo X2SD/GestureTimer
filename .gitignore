@@ -6,9 +6,14 @@ dist/
 **/target/
 *.pdb
 
+# 由 icon.png 自动垫成正方形的中间图（tauri icon 用，可重新生成）
+icon-square.png
+
 # 本地打包的便携目录与压缩包（勿提交二进制分发物）
-simple/速写计时器-便携版/
+simple/GestureTimer-便携版/
 simple/*便携*.zip
+simple/release-portable/
+simple/GestureTimer-portable.zip
 
 # OS / IDE
 .DS_Store

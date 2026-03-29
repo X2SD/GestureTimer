@@ -3,19 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>速写计时器</title>
+  <title>GestureTimer</title>
   <link rel="stylesheet" href="/src/styles.css" />
 </head>
 <body>
+  <div id="always-on-top-indicator" class="always-top-indicator hidden" title="窗口已置顶" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M12 4.5l-1.2 2.4h2.4L12 4.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M9.5 8.5h5v1.5c0 2-1.2 3.8-2.5 5.2V20l-2-2-2 2v-5.3c-1.3-1.4-2.5-3.2-2.5-5.2V8.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+    </svg>
+  </div>
   <div id="app" class="hidden">
-    <div class="app-topbar">
-      <button type="button" class="icon-btn" id="open-about" aria-label="关于本程序" title="关于本程序" style="margin: 0; padding: 4px;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </div>
-
     <div id="stage">
       <div id="photo-viewport">
         <div id="photo-transform">
@@ -24,99 +22,125 @@
       </div>
     </div>
     <footer id="bar">
-      <div class="bar-left">
-        <div class="preset-dropdown-wrap">
-          <button
-            type="button"
-            id="preset-trigger"
-            class="preset-trigger"
-            aria-expanded="false"
-            aria-haspopup="listbox"
-            aria-label="单张速写时长"
-            title="单张速写时长"
-          >
-            <span id="preset-trigger-label">1/2</span>
-            <svg class="preset-trigger-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <div id="preset-backdrop" class="preset-backdrop hidden" aria-hidden="true"></div>
-          <div id="preset-menu" class="preset-menu hidden" role="listbox" aria-labelledby="preset-trigger">
-            <button type="button" class="preset-option" role="option" data-seconds="30">30 秒</button>
-            <button type="button" class="preset-option" role="option" data-seconds="60">1 分</button>
-            <button type="button" class="preset-option" role="option" data-seconds="120">2 分</button>
-            <button type="button" class="preset-option" role="option" data-seconds="300">5 分</button>
-          </div>
-        </div>
-      </div>
-      <div class="bar-center">
-        <div class="bar-center-inner">
-          <div class="timer-row">
-            <button type="button" class="nav-btn nav-btn-circle" id="prev" aria-label="上一张" title="上一张">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <div class="bar-unified">
+        <div class="bar-unified-top">
+          <div class="timer-nav-row" aria-label="倒计时与翻页">
+            <button type="button" class="nav-btn nav-btn-circle nav-btn-muted" id="prev" aria-label="上一张" title="上一张">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M14 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
-            <div id="timer">0:30</div>
-            <button type="button" class="nav-btn nav-btn-circle" id="next" aria-label="下一张" title="下一张">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <div class="timer-column">
+              <div id="timer">0:30</div>
+              <div class="total-playback-line" id="total-playback-line">
+                <span class="total-playback-label">累计</span>
+                <span id="total-playback" class="total-playback" title="开始播放后累计的时长">0:00</span>
+              </div>
+            </div>
+            <button type="button" class="nav-btn nav-btn-circle nav-btn-muted" id="next" aria-label="下一张" title="下一张">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M10 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
           </div>
-          <div class="transport-bubble" role="group" aria-label="计时控制">
-            <button type="button" class="transport-btn" id="btn-play" aria-label="开始" title="开始">
+        </div>
+        <div class="bar-rule" id="bar-rule" aria-hidden="true"></div>
+        <div class="bar-tools" id="bar-tools">
+          <div class="preset-dropdown-wrap">
+            <button
+              type="button"
+              id="preset-trigger"
+              class="preset-trigger bar-tool bar-tool-preset"
+              aria-expanded="false"
+              aria-haspopup="listbox"
+              aria-label="单张时长"
+              title="单张时长"
+            >
+              <span id="preset-trigger-label" class="preset-trigger-value">1/2</span>
+              <svg class="preset-trigger-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div id="preset-backdrop" class="preset-backdrop hidden" aria-hidden="true"></div>
+            <div id="preset-menu" class="preset-menu hidden" role="listbox" aria-labelledby="preset-trigger">
+              <button type="button" class="preset-option" role="option" data-seconds="30">30 秒</button>
+              <button type="button" class="preset-option" role="option" data-seconds="60">1 分</button>
+              <button type="button" class="preset-option" role="option" data-seconds="120">2 分</button>
+              <button type="button" class="preset-option" role="option" data-seconds="300">5 分</button>
+            </div>
+          </div>
+          <div class="transport-inline" role="group" aria-label="计时控制">
+            <button type="button" class="transport-btn bar-tool" id="btn-play" aria-label="开始" title="开始">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
             </button>
-            <button type="button" class="transport-btn" id="btn-pause" aria-label="暂停" title="暂停">
+            <button type="button" class="transport-btn bar-tool" id="btn-pause" aria-label="暂停" title="暂停">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
             </button>
-            <button type="button" class="transport-btn" id="btn-stop" aria-label="停止（重置当前倒计时与总累计）" title="停止（重置当前倒计时与总累计）">
+            <button type="button" class="transport-btn bar-tool" id="btn-stop" aria-label="停止（重置当前倒计时与总累计）" title="停止（重置当前倒计时与总累计）">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
             </button>
           </div>
-        </div>
-      </div>
-      <div class="bar-right">
-        <div class="bar-total-block">
-          <button type="button" class="icon-btn" id="open-settings" aria-label="练习设置" title="练习设置">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <button type="button" class="icon-btn bar-tool" id="open-settings" aria-label="练习设置" title="练习设置">
+            <svg class="bar-tool-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
-          <div id="total-playback" class="total-playback" title="开始播放后累计的时长">0:00</div>
+          <button type="button" class="icon-btn bar-tool" id="open-folder" aria-label="导入文件夹" title="导入文件夹 (Ctrl+O)">
+            <svg class="bar-tool-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M4 6h6l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+              <path d="M4 10h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="icon-btn bar-tool bar-about-btn" id="open-about" aria-label="关于本程序" title="关于本程序">
+            <svg class="bar-tool-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 6.5v7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+              <circle cx="12" cy="17.35" r="1.25" fill="currentColor"/>
+            </svg>
+          </button>
         </div>
-        <button type="button" class="icon-btn" id="open-folder" aria-label="导入文件夹" title="导入文件夹 (Ctrl+O)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M4 6h6l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-            <path d="M4 10h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </button>
       </div>
     </footer>
   </div>
   <div id="empty">
     <p>尚未导入图片</p>
     <button type="button" id="empty-open">选择图片文件夹</button>
-    <p class="hint">支持 JPG、PNG、GIF、WebP、BMP</p>
+    <p class="hint">支持 JPG、PNG、GIF、WebP、BMP · 可将图片文件夹拖入窗口</p>
   </div>
 
   <div id="modal-overlay" class="modal-overlay hidden">
-    <div class="modal" id="panel-settings" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal modal-settings" id="panel-settings" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <h2 id="modal-title">练习设置</h2>
-      <div style="margin: 18px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-          <input type="checkbox" id="allow-repeat-toggle" checked style="margin: 0; width: 16px; height: 16px; accent-color: #1e6bd6;">
-          <span style="color: #e8e8e8; font-size: 14px;">重复</span>
+
+      <div class="settings-block settings-repeat-row">
+        <label class="settings-toggle-label" for="allow-repeat-toggle">
+          <input type="checkbox" id="allow-repeat-toggle" class="settings-toggle-input" checked />
+          <span class="settings-toggle-track" aria-hidden="true">
+            <span class="settings-toggle-thumb"></span>
+          </span>
+          <span class="settings-repeat-text">重复</span>
         </label>
-        <span style="font-size: 12px; color: #9a9a9a; line-height: 1.4;">开启后会随机到重复图片</span>
+        <p class="settings-hint">开启后会随机到重复图片</p>
       </div>
-      <div class="modal-row" style="align-items: center;">
-        <span style="font-size: 16px; color: #ccc; margin-right: 8px;">练习</span>
-        <input type="number" id="total-hours-input" min="0.25" max="24" step="0.25" value="1" />
-        <span class="modal-unit">h</span>
+
+      <div class="settings-block">
+        <div class="settings-duration-card">
+          <span class="settings-duration-label">练习时长</span>
+          <div class="settings-duration-input-wrap">
+            <input
+              type="number"
+              id="total-hours-input"
+              class="settings-duration-field"
+              min="0.25"
+              max="24"
+              step="0.25"
+              value="1"
+            />
+            <span class="settings-duration-unit">小时</span>
+          </div>
+        </div>
       </div>
-      <div class="modal-actions">
+
+      <div class="modal-actions modal-actions-settings">
         <button type="button" class="modal-btn secondary" id="modal-cancel">取消</button>
         <button type="button" class="modal-btn primary" id="modal-save">确定</button>
       </div>
@@ -146,7 +170,7 @@
     </div>
 
     <div class="modal hidden" id="panel-about" role="dialog" aria-modal="true" aria-labelledby="about-title">
-      <h2 id="about-title">速写计时器 v1.0</h2>
+      <h2 id="about-title">GestureTimer v1.1.0</h2>
       <p style="line-height: 1.6; font-size: 14px; color: #e8e8e8; margin: 18px 0;">
         作者：X2SD/bilibili<br>
         发布时间：2026年03月<br>

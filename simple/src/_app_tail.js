@@ -1,5 +1,11 @@
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+
 const STORAGE_TOTAL_HOURS = 'sketchTotalHours';
 const STORAGE_ALLOW_REPEAT = 'sketchAllowRepeat'; // 新增：允许重复抽取存储
+/** 窗口置顶偏好；缺省视为 true（与此前默认置顶一致） */
+const STORAGE_ALWAYS_ON_TOP = 'gestureAlwaysOnTop';
 
 const photo = document.getElementById('photo');
 const photoViewport = document.getElementById('photo-viewport');
@@ -36,6 +42,7 @@ const exhaustedCancel = document.getElementById('exhausted-cancel');
 const exhaustedContinue = document.getElementById('exhausted-continue');
 const openAboutBtn = document.getElementById('open-about');
 const panelAbout = document.getElementById('panel-about');
+const alwaysOnTopIndicator = document.getElementById('always-on-top-indicator');
 
 let imagePaths = [];
 let currentIndex = 0; // 当前显示的图片索引
@@ -64,6 +71,23 @@ const ZOOM_MIN = 0.05;
 const ZOOM_MAX = 16;
 const MENU_ZOOM_STEP = 1.15;
 const WHEEL_ZOOM_FACTOR = 1.09;
+
+function syncAlwaysOnTopIndicator(on) {
+  if (!alwaysOnTopIndicator) return;
+  alwaysOnTopIndicator.classList.toggle('hidden', !on);
+  alwaysOnTopIndicator.setAttribute('aria-hidden', on ? 'false' : 'true');
+}
+
+async function applyAlwaysOnTopFromStorage() {
+  const want = localStorage.getItem(STORAGE_ALWAYS_ON_TOP) !== 'false';
+  try {
+    const win = getCurrentWindow();
+    await win.setAlwaysOnTop(want);
+    syncAlwaysOnTopIndicator(await win.isAlwaysOnTop());
+  } catch {
+    syncAlwaysOnTopIndicator(false);
+  }
+}
 
 // ========== 工具方法 ==========
 function applyImageTransform() {
@@ -182,7 +206,6 @@ function togglePresetMenu() {
 function updateTransportButtons() {
   const running = timerState === 'running';
   const paused = timerState === 'paused';
-  const idle = timerState === 'idle';
 
   btnPlay.disabled = running || sessionEnded;
   btnPlay.classList.toggle('is-dim', btnPlay.disabled);
@@ -192,6 +215,20 @@ function updateTransportButtons() {
 
   btnStop.disabled = (!running && !paused) || sessionEnded;
   btnStop.classList.toggle('is-dim', btnStop.disabled);
+
+  syncBarPlayingLayout();
+}
+
+/** 播放中折叠底栏工具区，仅保留倒计时与翻页 */
+function syncBarPlayingLayout() {
+  if (!barEl) return;
+  const playing = timerState === 'running';
+  barEl.classList.toggle('is-playing', playing);
+  document.documentElement.style.setProperty(
+    '--bar-height',
+    playing ? 'var(--bar-height-playing)' : 'var(--bar-height-idle)',
+  );
+  if (playing) closePresetMenu();
 }
 
 function stopInterval() {
@@ -521,15 +558,12 @@ function closeModalOverlay() {
   if (panelAbout) panelAbout.classList.add('hidden');
 }
 
-async function pickFolder() {
-  closePresetMenu();
-  const { paths } = await window.api.selectFolder();
-  if (!paths || paths.length === 0) return;
+async function applyImageFolder(paths) {
+  if (!paths || paths.length === 0) return false;
   imagePaths = paths;
   currentIndex = 0;
   sessionEnded = false;
   totalPlaybackSec = 0;
-  // 重置所有状态
   historyIndexes = [];
   usedImageIndexes = [];
   noRemindExhausted = false;
@@ -544,6 +578,44 @@ async function pickFolder() {
   updateTransportButtons();
   showMain();
   await loadCurrentImage();
+  return true;
+}
+
+async function pickFolder() {
+  closePresetMenu();
+  const { paths } = await window.api.selectFolder();
+  await applyImageFolder(paths);
+}
+
+/** 拖入文件夹或图片文件时：优先按文件夹加载；若为单文件则尝试其所在目录 */
+async function tryLoadFromDropPaths(paths) {
+  if (!paths || paths.length === 0) return;
+  for (const p of paths) {
+    try {
+      const listed = await invoke('list_images_in_folder', { folder: p });
+      if (listed && listed.length > 0) {
+        await applyImageFolder(listed);
+        return;
+      }
+    } catch {
+      /* 不是文件夹或读取失败 */
+    }
+  }
+  for (const p of paths) {
+    const sep = p.includes('\\') ? '\\' : '/';
+    const last = p.lastIndexOf(sep);
+    if (last <= 0) continue;
+    const dir = p.slice(0, last);
+    try {
+      const listed = await invoke('list_images_in_folder', { folder: dir });
+      if (listed && listed.length > 0) {
+        await applyImageFolder(listed);
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 // ========== 事件监听 ==========
@@ -766,3 +838,25 @@ updateTotalPlaybackDisplay();
 updateTransportButtons();
 resetImageView();
 showEmpty();
+
+void (async () => {
+  await applyAlwaysOnTopFromStorage();
+  try {
+    await listen('always-on-top-changed', (e) => {
+      const next = Boolean(e.payload);
+      localStorage.setItem(STORAGE_ALWAYS_ON_TOP, String(next));
+      syncAlwaysOnTopIndicator(next);
+    });
+  } catch {
+    /* 非 Tauri 环境 */
+  }
+  try {
+    const win = getCurrentWindow();
+    await win.onDragDropEvent((e) => {
+      if (e.payload.type !== 'drop') return;
+      void tryLoadFromDropPaths(e.payload.paths);
+    });
+  } catch {
+    /* 非 Tauri 环境 */
+  }
+})();
