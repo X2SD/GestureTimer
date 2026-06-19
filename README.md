@@ -20,7 +20,7 @@ A minimal desktop timer for **gesture / figure‑drawing practice**: load a fold
 
 ## Download & run
 
-Grab the latest Windows build from the [Releases](https://github.com/yangyan1999710-gif/sketch-timer/releases) page:
+Grab the latest Windows build from the [Releases](https://github.com/X2SD/GestureTimer/releases) page:
 
 - `GestureTimer_<version>_x64-setup.exe` — installer, or
 - the portable `gesture-timer.exe`.
@@ -32,8 +32,8 @@ Grab the latest Windows build from the [Releases](https://github.com/yangyan1999
 Requires [Node.js](https://nodejs.org/) and [Rust (rustup)](https://rustup.rs/).
 
 ```bash
-git clone https://github.com/yangyan1999710-gif/sketch-timer.git
-cd sketch-timer/simple
+git clone https://github.com/X2SD/GestureTimer.git
+cd GestureTimer/simple
 npm install
 npm run tauri:dev      # run in dev mode
 ```
