@@ -74,8 +74,9 @@ pub fn run() {
     {
         builder = builder.plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts(["CommandOrControl+KeyT"])
-                .expect("register global shortcut CommandOrControl+KeyT")
+                // Ctrl+T 会与浏览器等全局冲突；改用 Ctrl+Shift+T（全局占用，勿与常用软件撞键）
+                .with_shortcuts(["CommandOrControl+Shift+KeyT"])
+                .expect("register global shortcut CommandOrControl+Shift+KeyT")
                 .with_handler(|app, _shortcut, event| {
                     use tauri::{Emitter, Manager};
                     use tauri_plugin_global_shortcut::ShortcutState;

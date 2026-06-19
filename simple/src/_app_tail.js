@@ -6,6 +6,9 @@ const STORAGE_TOTAL_HOURS = 'sketchTotalHours';
 const STORAGE_ALLOW_REPEAT = 'sketchAllowRepeat'; // 新增：允许重复抽取存储
 /** 窗口置顶偏好；缺省视为 true（与此前默认置顶一致） */
 const STORAGE_ALWAYS_ON_TOP = 'gestureAlwaysOnTop';
+/** 最近使用过的文件夹列表（一键重新打开，免去每次手动选） */
+const STORAGE_RECENT_FOLDERS = 'gestureRecentFolders';
+const RECENT_MAX = 6;
 
 const photo = document.getElementById('photo');
 const photoViewport = document.getElementById('photo-viewport');
@@ -43,6 +46,9 @@ const exhaustedContinue = document.getElementById('exhausted-continue');
 const openAboutBtn = document.getElementById('open-about');
 const panelAbout = document.getElementById('panel-about');
 const alwaysOnTopIndicator = document.getElementById('always-on-top-indicator');
+const recentWrap = document.getElementById('recent-folders');
+const recentList = document.getElementById('recent-list');
+const recentError = document.getElementById('recent-error');
 
 let imagePaths = [];
 let currentIndex = 0; // 当前显示的图片索引
@@ -87,6 +93,119 @@ async function applyAlwaysOnTopFromStorage() {
   } catch {
     syncAlwaysOnTopIndicator(false);
   }
+}
+
+// ========== 最近使用文件夹 ==========
+function getRecentFolders() {
+  try {
+    const raw = localStorage.getItem(STORAGE_RECENT_FOLDERS);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr)
+      ? arr.filter((it) => it && typeof it.path === 'string' && it.path)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentFolders(list) {
+  try {
+    localStorage.setItem(STORAGE_RECENT_FOLDERS, JSON.stringify(list.slice(0, RECENT_MAX)));
+  } catch {
+    /* localStorage 不可用或超限：忽略 */
+  }
+}
+
+function folderNameFromPath(p) {
+  const trimmed = String(p).replace(/[\\/]+$/, '');
+  const sep = trimmed.includes('\\') ? '\\' : '/';
+  const idx = trimmed.lastIndexOf(sep);
+  return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
+}
+
+/** 记录一个成功打开过的文件夹：置顶、去重、限长 */
+function addRecentFolder(path) {
+  if (!path) return;
+  const list = getRecentFolders().filter((it) => it.path !== path);
+  list.unshift({ path, name: folderNameFromPath(path), lastUsed: Date.now() });
+  saveRecentFolders(list);
+  renderRecentFolders();
+}
+
+function removeRecentFolder(path) {
+  saveRecentFolders(getRecentFolders().filter((it) => it.path !== path));
+  renderRecentFolders();
+}
+
+function showRecentError(msg) {
+  if (!recentError) return;
+  recentError.textContent = msg;
+  recentError.classList.remove('hidden');
+}
+
+function hideRecentError() {
+  if (!recentError) return;
+  recentError.classList.add('hidden');
+  recentError.textContent = '';
+}
+
+function renderRecentFolders() {
+  if (!recentWrap || !recentList) return;
+  const list = getRecentFolders();
+  recentList.textContent = '';
+  if (list.length === 0) {
+    recentWrap.classList.add('hidden');
+    return;
+  }
+  recentWrap.classList.remove('hidden');
+  for (const item of list) {
+    const li = document.createElement('li');
+    li.className = 'recent-item';
+
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.className = 'recent-open';
+    openBtn.title = item.path;
+    const nameEl = document.createElement('span');
+    nameEl.className = 'recent-name';
+    nameEl.textContent = item.name || item.path;
+    const pathEl = document.createElement('span');
+    pathEl.className = 'recent-path';
+    pathEl.textContent = item.path;
+    openBtn.append(nameEl, pathEl);
+    openBtn.addEventListener('click', () => void loadFolderByPath(item.path));
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'recent-remove';
+    delBtn.title = '从列表移除';
+    delBtn.setAttribute('aria-label', '从最近列表移除');
+    delBtn.textContent = '×';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeRecentFolder(item.path);
+    });
+
+    li.append(openBtn, delBtn);
+    recentList.appendChild(li);
+  }
+}
+
+/** 点击最近列表：重新读取该文件夹；若已不存在或无图片则移除并提示 */
+async function loadFolderByPath(path) {
+  hideRecentError();
+  let listed = [];
+  try {
+    listed = await invoke('list_images_in_folder', { folder: path });
+  } catch {
+    listed = [];
+  }
+  if (!listed || listed.length === 0) {
+    removeRecentFolder(path);
+    showRecentError('文件夹不存在或已无图片，已从最近列表移除');
+    return;
+  }
+  await applyImageFolder(listed, path);
 }
 
 // ========== 工具方法 ==========
@@ -325,6 +444,41 @@ function pickUnusedRandomIndex() {
   return unusedIndexes[randomIdx];
 }
 
+function pushHistoryIndex(index) {
+  historyIndexes.push(index);
+  if (historyIndexes.length > 50) historyIndexes.shift();
+}
+
+function markImageUsed(index) {
+  if (!usedImageIndexes.includes(index)) {
+    usedImageIndexes.push(index);
+  }
+}
+
+function markCurrentImageUsed() {
+  if (imagePaths.length > 0) {
+    markImageUsed(currentIndex);
+  }
+}
+
+function resetNoRepeatRoundForContinue() {
+  usedImageIndexes = [];
+  if (imagePaths.length > 1) {
+    markCurrentImageUsed();
+  }
+}
+
+async function continueAfterImagesExhausted() {
+  resetNoRepeatRoundForContinue();
+  if (imagePaths.length <= 1) {
+    const ok = await loadCurrentImage();
+    if (!ok || sessionEnded) return;
+    startTimerAfterLoad();
+    return;
+  }
+  await goNextRandomAndContinue();
+}
+
 /** 允许重复时：获取与当前不同的随机下标 */
 function pickRandomNextIndex() {
   if (imagePaths.length <= 1) return 0;
@@ -338,8 +492,7 @@ function pickRandomNextIndex() {
 /** 处理图片抽取完毕逻辑 */
 async function handleImagesExhausted() {
   if (noRemindExhausted) {
-    usedImageIndexes = [];
-    await goNextRandomAndContinue();
+    await continueAfterImagesExhausted();
     return;
   }
   openImagesExhaustedModal();
@@ -364,24 +517,22 @@ function startTimerAfterLoad() {
 async function goNextRandomAndContinue() {
   if (imagePaths.length === 0 || sessionEnded) return;
 
-  // 核心：跳下一张前，把当前图片加入历史记录
-  historyIndexes.push(currentIndex);
-  if (historyIndexes.length > 50) historyIndexes.shift(); // 最多存50条
-
   let nextIndex;
   if (allowRepeatMode) {
     // 勾选重复：随机抽取（可能重复）
     nextIndex = pickRandomNextIndex();
   } else {
     // 未勾选重复：先抽完所有不重复的
+    markCurrentImageUsed();
     nextIndex = pickUnusedRandomIndex();
     if (nextIndex === -1) {
       await handleImagesExhausted();
       return;
     }
-    usedImageIndexes.push(nextIndex);
+    markImageUsed(nextIndex);
   }
 
+  pushHistoryIndex(currentIndex);
   currentIndex = nextIndex;
   const ok = await loadCurrentImage();
   if (!ok || sessionEnded) return;
@@ -429,22 +580,20 @@ async function goNext() {
   remainingSec = 0;
   idleShowsZero = false;
 
-  // 手动跳下一张：记录当前图片到历史
-  historyIndexes.push(currentIndex);
-  if (historyIndexes.length > 50) historyIndexes.shift();
-
   let nextIndex;
   if (allowRepeatMode) {
     nextIndex = pickRandomNextIndex();
   } else {
+    markCurrentImageUsed();
     nextIndex = pickUnusedRandomIndex();
     if (nextIndex === -1) {
       await handleImagesExhausted();
       return;
     }
-    usedImageIndexes.push(nextIndex);
+    markImageUsed(nextIndex);
   }
 
+  pushHistoryIndex(currentIndex);
   currentIndex = nextIndex;
   const ok = await loadCurrentImage();
   if (!ok) {
@@ -517,6 +666,8 @@ function showEmpty() {
   updateTimerDisplay();
   updateTotalPlaybackDisplay();
   updateTransportButtons();
+  hideRecentError();
+  renderRecentFolders();
 }
 
 // ========== 弹窗相关 ==========
@@ -558,7 +709,7 @@ function closeModalOverlay() {
   if (panelAbout) panelAbout.classList.add('hidden');
 }
 
-async function applyImageFolder(paths) {
+async function applyImageFolder(paths, folderPath) {
   if (!paths || paths.length === 0) return false;
   imagePaths = paths;
   currentIndex = 0;
@@ -568,6 +719,9 @@ async function applyImageFolder(paths) {
   usedImageIndexes = [];
   noRemindExhausted = false;
   allowRepeatMode = getAllowRepeatMode();
+  if (!allowRepeatMode) {
+    markCurrentImageUsed();
+  }
   stopInterval();
   timerState = 'idle';
   remainingSec = 0;
@@ -578,13 +732,17 @@ async function applyImageFolder(paths) {
   updateTransportButtons();
   showMain();
   await loadCurrentImage();
+  if (folderPath) {
+    hideRecentError();
+    addRecentFolder(folderPath);
+  }
   return true;
 }
 
 async function pickFolder() {
   closePresetMenu();
-  const { paths } = await window.api.selectFolder();
-  await applyImageFolder(paths);
+  const { folder, paths } = await window.api.selectFolder();
+  await applyImageFolder(paths, folder);
 }
 
 /** 拖入文件夹或图片文件时：优先按文件夹加载；若为单文件则尝试其所在目录 */
@@ -594,7 +752,7 @@ async function tryLoadFromDropPaths(paths) {
     try {
       const listed = await invoke('list_images_in_folder', { folder: p });
       if (listed && listed.length > 0) {
-        await applyImageFolder(listed);
+        await applyImageFolder(listed, p);
         return;
       }
     } catch {
@@ -609,7 +767,7 @@ async function tryLoadFromDropPaths(paths) {
     try {
       const listed = await invoke('list_images_in_folder', { folder: dir });
       if (listed && listed.length > 0) {
-        await applyImageFolder(listed);
+        await applyImageFolder(listed, dir);
         return;
       }
     } catch {
@@ -691,6 +849,9 @@ modalSave.addEventListener('click', () => {
   // 保存重复抽取开关
   allowRepeatMode = allowRepeatToggle.checked;
   localStorage.setItem(STORAGE_ALLOW_REPEAT, String(allowRepeatMode));
+  if (!allowRepeatMode) {
+    markCurrentImageUsed();
+  }
   
   closeModalOverlay();
   if (!sessionEnded && isPlaybackLimitReached()) {
@@ -717,9 +878,8 @@ exhaustedCancel.addEventListener('click', () => {
 // 图片抽完弹窗 - 继续
 exhaustedContinue.addEventListener('click', async () => {
   noRemindExhausted = noRemindThisRound.checked;
-  usedImageIndexes = [];
   closeModalOverlay();
-  await goNextRandomAndContinue();
+  await continueAfterImagesExhausted();
 });
 
 

@@ -1,6 +1,6 @@
 [package]
 name = "gesture-timer"
-version = "1.1.0"
+version = "1.2.0"
 description = "GestureTimer"
 authors = ["you"]
 edition = "2021"

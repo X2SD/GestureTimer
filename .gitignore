@@ -21,3 +21,8 @@ Thumbs.db
 .vs/
 .idea/
 *.log
+
+# 本地 agent 配置 / 记忆 / 构建日志 / 设计参考草图（勿提交）
+.claude/
+build-log.txt
+figma-*.png
